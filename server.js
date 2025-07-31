@@ -15,3 +15,11 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`);
 });
+
+function shutdown(signal) {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    process.exit(0);
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

@@ -1,5 +1,5 @@
 const axios = require('axios');
-const iltorb = require('iltorb');
+const { compressData, compressDataGzip } = require('./utils'); // Adjust the path as necessary
 
 // The data you want to send in the body
 const requestData = {
@@ -7,19 +7,7 @@ const requestData = {
   anotherKey: 'anotherValue'
 };
 
-// Compress the data using Brotli
-const compressData = (data) => {
-  return new Promise((resolve, reject) => {
-    iltorb.compress(Buffer.from(JSON.stringify(data)), (err, compressed) => {
-      if (err) reject(err);
-      else resolve(compressed);
-    });
-  });
-};
-
 // Send the POST request with compressed body
-const zlib = require('zlib');
-
 // 1. Content-Encoding: br (Brotli)
 const sendRequestBr = async () => {
   try {
@@ -34,16 +22,6 @@ const sendRequestBr = async () => {
   } catch (error) {
     console.error('Error sending Brotli request:', error);
   }
-};
-
-// 2. Content-Encoding: gzip
-const compressDataGzip = (data) => {
-  return new Promise((resolve, reject) => {
-    zlib.gzip(Buffer.from(JSON.stringify(data)), (err, result) => {
-      if (err) reject(err);
-      else resolve(result);
-    });
-  });
 };
 
 const sendRequestGzip = async () => {
@@ -92,7 +70,6 @@ const sendRequestAcceptGzip = async () => {
 };
 
 // Additional requests to /proxy route
-
 const sendProxyRequestBr = async () => {
   try {
     const compressedData = await compressData(requestData);
@@ -123,6 +100,37 @@ const sendProxyRequestGzip = async () => {
   }
 };
 
+// New makeRequest function
+async function sendProxyPost() {
+  try {
+    const encodings = ['br', 'gzip'];
+    const randomEncoding = encodings[Math.floor(Math.random() * encodings.length)];
+
+    let compressedBody;
+    if (randomEncoding === 'br') {
+      compressedBody = await compressData(requestData);
+    } else {
+      compressedBody = await compressDataGzip(requestData);
+    }
+
+    const response = await axios.post('http://localhost:3000/proxy/post', compressedBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Encoding': randomEncoding,
+        'Accept-Encoding': 'gzip, br'
+      },
+      responseType: 'arraybuffer'
+    });
+
+    const responseData = response.data.toString('utf-8');
+    const responseObj = JSON.parse(responseData);
+    console.log('Proxy POST Response:', responseObj);
+  } catch (error) {
+    console.error('Error making request:', error.message);
+  }
+}
+
+// Call all request functions
 sendRequestBr();
 sendRequestGzip();
 sendRequestAcceptBr();
@@ -131,3 +139,4 @@ sendProxyRequestBr();
 sendProxyRequestGzip();
 sendRequestAcceptBr();
 sendRequestAcceptGzip();
+sendProxyPost();

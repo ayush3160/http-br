@@ -40,7 +40,7 @@ app.post('/', compression({ threshold: 0 }), async (req, res) => {
         // If not JSON, just wrap as message
         bodyObj = { message: decoded };
       }
-      bodyObj.timestamp = new Date();
+      // bodyObj.timestamp = new Date();
 
       const responseBody = JSON.stringify(bodyObj);
       res.type('application/json');

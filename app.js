@@ -1,6 +1,8 @@
 const express = require('express');
 const compression = require('compression');
+const axios = require('axios');
 const zlib = require('zlib');
+const { compressData, compressDataGzip } = require('./utils');
 const app = express();
 const port = 3000;
 
@@ -127,27 +129,31 @@ app.post('/proxy/post', async (req, res) => {
 
     let compressedBody;
     if (randomEncoding === 'br') {
-      compressedBody = zlib.brotliCompressSync(Buffer.from(requestBodyString));
+      compressedBody = await compressData(requestBody);
     } else {
-      compressedBody = zlib.gzipSync(Buffer.from(requestBodyString));
+      compressedBody = await compressDataGzip(requestBody);
     }
 
-    const serverResponse = await fetch('http://localhost:5000/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Encoding': randomEncoding,
-        'Accept-Encoding': 'gzip, br'
-      },
-      body: compressedBody
-    });
+    const serverResponse = await axios.post(
+      'http://localhost:5000/',
+      compressedBody,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Encoding': randomEncoding,
+          'Accept-Encoding': 'gzip, br'
+        },
+        responseType: 'arraybuffer', // To handle compressed responses
+        validateStatus: () => true // Allow handling of non-2xx status codes
+      }
+    );
 
-    const responseData = await serverResponse.text();
-    
-    for (const [key, value] of serverResponse.headers.entries()) {
-        if (key.toLowerCase() !== 'transfer-encoding' && key.toLowerCase() !== 'connection') {
-             res.setHeader(key, value);
-        }
+    const responseData = Buffer.from(serverResponse.data).toString();
+
+    for (const [key, value] of Object.entries(serverResponse.headers)) {
+      if (key.toLowerCase() !== 'transfer-encoding' && key.toLowerCase() !== 'connection') {
+        res.setHeader(key, value);
+      }
     }
 
     res.status(serverResponse.status).send(responseData);
@@ -172,4 +178,3 @@ function shutdown(signal) {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-
